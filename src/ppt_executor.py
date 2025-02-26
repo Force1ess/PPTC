@@ -1,5 +1,7 @@
 import collections 
 import collections.abc
+import os
+import traceback
 from pptx import Presentation
 from pptx.util import Inches, Cm, Pt
 from pptx.enum.shapes import MSO_SHAPE
@@ -12,6 +14,7 @@ from pptx.enum.text import MSO_AUTO_SIZE
 from pptx.enum.text import PP_ALIGN
 from src import api_doc
 from src import ppt_reader
+from glob import glob
 
 SLIDE_HEIGHT = 6858000
 SLIDE_WIDTH = 9144000
@@ -39,7 +42,7 @@ SHAPE_TOP = CENTER_TOP - SHAPE_HEIGHT / 2
 PIC_LEFT = CONTENT_LEFT
 PIC_TOP = CONTENT_TOP 
 
-PIC_PATH = "test/pics"
+PIC_PATH = "PPTC/test/pics"
 
 current_shape = None
 current_slide = None
@@ -87,7 +90,7 @@ def get_text_info(shape):
     underline = font.underline
     size = font.size if font.size is not None else shape.text_frame.paragraphs[0].font.size
     try:
-        color = font.color.rgb 
+        color = font.color
     except:
         color = None
     fill = get_fill_color(shape)
@@ -110,20 +113,18 @@ def get_text_info(shape):
 
 def set_text_info(shape):
     global text_info_dict
-    try:
-        for paragraph in shape.text_frame.paragraphs:
-            for run in paragraph.runs:
-                run.font.size = text_info_dict["size"]
-                if text_info_dict["color"]:
-                    run.font.color.rgb = text_info_dict["color"]
-                run.font.bold = text_info_dict["bold"]
-                run.font.italic = text_info_dict["italic"]
-                run.font.underline = text_info_dict["underline"]
-                run.font.name = text_info_dict["font_name"]
-        paragraph.line_spacing = text_info_dict["line_spacing"]
-        paragraph.alignment = text_info_dict["alignment"]
-    except Exception as e:
-        print(e)
+    for paragraph in shape.text_frame.paragraphs:
+        for run in paragraph.runs:
+            run.font.size = text_info_dict["size"]
+            if text_info_dict["color"]:
+                run.font.fill.solid()
+                run.font.fill.fore_color.rgb = RGBColor.from_string(text_info_dict["color"])
+            run.font.bold = text_info_dict["bold"]
+            run.font.italic = text_info_dict["italic"]
+            run.font.underline = text_info_dict["underline"]
+            run.font.name = text_info_dict["font_name"]
+    paragraph.line_spacing = text_info_dict["line_spacing"]
+    paragraph.alignment = text_info_dict["alignment"]
 
 # apis
 def API_executor(lines, test=False,args=None):
@@ -155,10 +156,11 @@ def API_executor(lines, test=False,args=None):
             else:
                 eval(line) 
         except Exception as e:
-            print(f"ERROR: {line}")
+            print(f"ERROR: {line}", e)
+            print(traceback.format_exc())
             error_info += f"ERROR: {line}\n"
     return error_info
-    
+
 
 def set_ppt(ppt_path):
     global slides, prs, current_shape, current_slide, table, picture, chart, smartart, textbox, shape
@@ -283,14 +285,16 @@ def choose_textbox(idx=0):
     if textbox != None:
         current_shape = textbox
     else:
-        cur_idx = 0
-        for shape in current_slide.shapes:
-            if 'TEXT_BOX' in str(shape.shape_type):
-                if cur_idx == idx:
+        shape = current_slide.shapes[idx]
+        if 'TEXT_BOX' in str(shape.shape_type):
+            current_shape = shape
+        if 'GROUP' in str(shape.shape_type):
+            for shape in shape.shapes:
+                if 'TEXT_BOX' in str(shape.shape_type):
                     current_shape = shape
                     break
-                else:
-                    cur_idx += 1
+    if current_shape == None:
+        raise ValueError(f"Textbox {idx} not found")
     get_text_info(current_shape)
 
 def choose_picture(idx=0):
@@ -395,7 +399,8 @@ def set_font_color(color):
     global current_slide, current_shape
     for paragraph in current_shape.text_frame.paragraphs:
         for run in paragraph.runs:
-            run.font.color.rgb = RGBColor.from_string(color2hex[color])
+            run.font.fill.solid()
+            run.font.fill.fore_color.rgb = RGBColor.from_string(color2hex[color])
 
 def set_font_bold():
     global current_slide, current_shape
@@ -482,13 +487,13 @@ def insert_circle():
     current_shape = current_slide.shapes.add_shape(MSO_SHAPE.OVAL, SHAPE_LEFT, SHAPE_TOP, SHAPE_WIDTH, SHAPE_HEIGHT)
     shape[f'circle'] = current_shape
 
-# picture
+# eeeeere
 def insert_picture(picture_name):
     global current_slide, current_shape, picture
-    try:
-        current_shape = current_slide.shapes.add_picture(f"{PIC_PATH}/{picture_name}.png", PIC_LEFT, PIC_TOP)
-    except:
-        current_shape = current_slide.shapes.add_picture(f"{PIC_PATH}/none.png", PIC_LEFT, PIC_TOP)
+    picture_name = picture_name+'.jpg'
+    if not os.path.exists(f"{PIC_PATH}/{picture_name}"):
+        raise ValueError(f"Picture {picture_name} not found")
+    current_shape = current_slide.shapes.add_picture(f"{PIC_PATH}/{picture_name}", PIC_LEFT, PIC_TOP)
     picture = current_shape
     picture.width = Cm(6)
     picture.height = Cm(6)

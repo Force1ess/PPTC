@@ -6,7 +6,7 @@ from pptx import Presentation
 from pptx.enum.dml import MSO_THEME_COLOR, MSO_FILL
 from pptx.dml.color import RGBColor
 from .content_selection import *
-from .openai_api import *
+# from .openai_api import *
 from .prompt_factor import *
 
 global slides

@@ -1,4 +1,4 @@
-from .openai_api import *
+# from .openai_api import *
 from .prompt_factor import *
 
 def select_information_type(query,args):
